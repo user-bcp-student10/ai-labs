@@ -1,0 +1,31 @@
+Revisión de seguridad del PR #18 completada. El informe está en revision-seguridad-PR18.md. Es local, no está en el repositorio y no lo publiqué. No apruebo ni rechazo el PR.
+
+SHA registrados
+
+Base (main): 91b73a2ce577695ee397f0262fd1d92061c701c6
+Cabeza (dependabot/npm_and_yarn/web/angular/compiler-22.2.3): a6bc8bee7cf12afb60b57b77dba46ce68ac00421
+El skill revisor-pr-seguridad no estaba en mi lista de skills registrados. Lo encontré en SKILL.md y seguí ese procedimiento.
+
+Hallazgos
+
+ID	Clasificación	Severidad	Resumen
+SEC-18-01	Defecto demostrado	Media	@angular/core sigue en 21.2.19, dentro del rango de GHSA-hh8m-fm6v-7cvg (CVE-2026-88057, XSS por bypass de sanitización). El PR solo actualiza el compilador. La explotabilidad en la app es un riesgo por confirmar: no hay host bindings de riesgo en web/src.
+SEC-18-02	Defecto demostrado	Baja (Media si se fuerza la instalación)	El lock es inconsistente: @angular/compiler 22.2.3 frente a core y compiler-cli 21.2.19. npm ci falla con ERESOLVE y el job web no ejecuta tests ni build.
+SEC-18-03	Riesgo por confirmar	Baja	Copia anidada de @angular/compiler 21.2.25 (dev). Los commits de endurecimiento de 22.2.3 no están en v21.2.25, aunque podría haber un backport con otro SHA.
+Lo que sí mejora: el compilador sale del rango afectado, las integridades coinciden con el registro npm, no hay fuentes fuera del registro ni scripts de instalación nuevos, y el commit está firmado.
+
+Comprobaciones no realizadas
+
+Dependency Review no evaluó el PR porque no está soportado en el repositorio.
+CodeQL javascript-typescript se canceló y java-kotlin falló.
+npm test, test:coverage y build no se ejecutaron por el ERESOLVE.
+npm audit no se ejecutó, porque enviaría el árbol de dependencias a un servicio externo. Usé la base de advisories de GitHub.
+No hubo prueba dinámica de la aplicación.
+Observaciones fuera del diff (preexistentes): [innerHTML]="message" en login.component.html:39 y la concatenación de username en la URL de dashboard.component.ts:43.
+
+Notas de operación
+
+Traje objetos del PR y de main con git fetch por URL. No creé remotos ni ramas, y borré los temporales.
+github-mcp-server devolvió un error de transporte al pedir los check runs; usé github-official-readonly.
+Durante la sesión apareció un commit ajeno, bb898fa ("reto dia 3"), que incluye el skill. No lo creé yo.
+Recomendación para el equipo: alinear toda la familia Angular en una sola línea (21.x con core ≥ 21.2.20, o 22.x completo) y regenerar el lock, sin --legacy-peer-deps ni --force.
