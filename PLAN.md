@@ -58,6 +58,10 @@ Propuesta para los siete hallazgos pendientes de auth. La selección de IDs cuen
 
 **Comprobación después:** verificar con la biblioteca elegida la firma, claims acordados y expiración del token generado; conservar la estructura HTTP. No se presupone que exista un endpoint de validación de tokens en auth. La clave de test será ficticia.
 
+**Cambio aplicado:** se añadió `quarkus-smallrye-jwt-build` (versión gestionada por el BOM de Quarkus 3.27.4). `AuthTokenIssuer` emite JWT HS256 con `sub`, `role` y `exp` (3600 s, constante compartida con `expiresIn`), firmado con `auth.token.secret`. `AuthService` delega en el emisor; `LegacyTokenUtil.java` se eliminó. Decisiones aprobadas: el token legacy se rechaza en despliegue (no hay compatibilidad) y el campo `debug` no cambia. `AUTH_TOKEN_SECRET` debe tener al menos 32 bytes para HS256; rotar el secreto invalida los tokens emitidos.
+
+**Comprobación real:** `python tools/lab.py test auth` antes del cambio: BUILD SUCCESS, 15 tests. Después: BUILD SUCCESS, 20 tests (15 en `AuthResourceTest`, 5 nuevos en `AuthTokenIssuerTest`: HS256 con firma verificada con JCA, claims `sub`/`role`/`exp`, secreto ausente del token, rechazo de payload alterado y de otra clave). JaCoCo: `AuthTokenIssuer` 7/7 líneas, `AuthService` 10/10 líneas.
+
 ### H-AUTH-04: Detalles de excepción expuestos
 
 **Problema:** el catch del recurso devuelve al cliente el mensaje y el nombre de clase de la excepción.
@@ -122,8 +126,8 @@ Propuesta para los siete hallazgos pendientes de auth. La selección de IDs cuen
 
 
 - Contrato de endpoints: no hay `docs/ENDPOINTS.md`; se usa el comportamiento observado descrito al inicio.
-- Compatibilidad del token legacy: pendiente de confirmar si algún consumidor depende del formato interno antes de H-AUTH-03.
-- H-AUTH-03: pendiente confirmar si algún consumidor depende del formato interno del token legacy; la aprobación de IDs no resuelve esa compatibilidad.
+- Compatibilidad del token legacy: resuelta por decisión humana; el token legacy se rechaza en despliegue y no se mantiene compatibilidad.
+- H-AUTH-03: resuelto con token JWT HS256 (SmallRye JWT); ver ejecuciones abajo.
 - CodeQL y Dependency Review remotos no fueron ejecutados. El SCA local cubrió únicamente las seis coordenadas indicadas en el registro.
 - `auth/pom.xml` figuraba modificado previamente; inspeccionar su diff desde la raíz y preservar cambios ajenos antes de cualquier edición.
 
@@ -151,6 +155,9 @@ Propuesta para los siete hallazgos pendientes de auth. La selección de IDs cuen
 | 2026-10-26 | auth | H-AUTH-06, H-AUTH-07 | cwd `auth/`: `mvn -Dtest=AuthResourceTest test` (caracterización antes de refactorizar producción) | `BUILD SUCCESS`; 8 tests aprobados, 0 fallos; status y estructura HTTP preservados. |
 | 2026-10-26 | auth | H-AUTH-07 | cwd `auth/`: `mvn -Dtest=AuthResourceTest test` (después de la refactorización) | `BUILD SUCCESS`; 8 tests aprobados, 0 fallos. |
 | 2026-10-26 | auth | H-AUTH-06, H-AUTH-07 | cwd `auth/`: `mvn verify` | `BUILD SUCCESS`; 8 tests aprobados, 0 fallos. JaCoCo: clases `AuthResource`, `AuthService`, `LoginResponse`, `LegacyDatabase`, `LegacyTokenUtil`, 84/92 líneas cubiertas (91.3%). |
+| 2026-10-27 | auth | H-AUTH-03 | `python tools/lab.py test auth` (baseline, antes del cambio, rama `feature/H-AUTH-03-token-firmado`) | `BUILD SUCCESS`; 15 tests, 0 fallos. |
+| 2026-10-27 | auth | H-AUTH-03 | `python tools/lab.py test auth` (primer intento tras el cambio) | `BUILD FAILURE` de compilación: `TOKEN_EXPIRATION_SECONDS` no resuelto en `AuthService`; corregido usando `AuthTokenIssuer.TOKEN_EXPIRATION_SECONDS`. |
+| 2026-10-27 | auth | H-AUTH-03 | `python tools/lab.py test auth` (después del cambio) | `BUILD SUCCESS`; 20 tests, 0 fallos (15 `AuthResourceTest` + 5 `AuthTokenIssuerTest`). JaCoCo: `AuthTokenIssuer` 7/7 líneas, `AuthService` 10/10 líneas. |
 
 Añadir cada ejecución posterior con componente `auth`, IDs relacionados, comando, resultado y evidencia real. No atribuir resultados no observados.
 

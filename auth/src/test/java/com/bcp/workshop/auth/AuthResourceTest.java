@@ -8,17 +8,18 @@ import org.junit.jupiter.api.Test;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.health.HealthCheck;
 import org.eclipse.microprofile.health.HealthCheckResponse;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.health.Readiness;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
+import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,6 +33,9 @@ import jakarta.ws.rs.core.Response;
 class AuthResourceTest {
     @Inject
     LegacyDatabase database;
+
+    @ConfigProperty(name = "auth.token.secret")
+    String tokenSecret;
 
     @Test
     void healthEndpointReportsUp() {
@@ -68,7 +72,7 @@ class AuthResourceTest {
 
     @Test
     void logsInWithWorkshopUser() {
-        String token = given()
+        var response = given()
                 .contentType("application/json")
                 .body("{\"username\":\"student\",\"password\":\"Workshop123!\",\"client\":\"angular-workshop\"}")
                 .when().post("/auth/login")
@@ -80,9 +84,22 @@ class AuthResourceTest {
                 .body("user.displayName", notNullValue())
                 .body("user.role", notNullValue())
                 .body("debug", is("authenticated-with-legacy-flow"))
-            .extract().path("token");
-        String tokenValue = new String(Base64.getDecoder().decode(token), StandardCharsets.UTF_8);
-        assertTrue(tokenValue.endsWith("|TEST_ONLY_AUTH_TOKEN_SECRET_CHANGE_ME_2026"));
+            .extract().response();
+        String token = response.path("token");
+        String role = response.path("user.role");
+
+        assertEquals("HS256", TestJwt.header(token).get("alg"));
+        assertTrue(TestJwt.hasValidHmacSignature(token, tokenSecret));
+        assertEquals("student", TestJwt.payload(token).get("sub"));
+        assertEquals(role, TestJwt.payload(token).get("role"));
+        assertFalse(token.contains(tokenSecret));
+        assertExpiresWithinConfiguredLifetime(TestJwt.payload(token));
+    }
+
+    private static void assertExpiresWithinConfiguredLifetime(Map<String, Object> payload) {
+        long expiry = ((Number) payload.get("exp")).longValue();
+        long now = Instant.now().getEpochSecond();
+        assertTrue(expiry > now + 3599 && expiry <= now + 3600, "exp must be about one hour ahead");
     }
 
     @Test
