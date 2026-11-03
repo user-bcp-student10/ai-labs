@@ -9,11 +9,9 @@
   de contrato independiente en este documento.
 - **Contrato acordado:** no consta un contrato acordado distinto del observado.
 - **Riesgos y preguntas abiertas:** la autenticación usa un token Base64
-  heredado, no JWT firmado; `owner` enviado por el cliente puede seleccionar
-  otro propietario en listado, resumen y creación; `/api/backend-health`
-  devuelve texto crudo de errores de conexión. El emisor no tiene contrato JWT
-  documentado. La política de sobrescritura de una carga con nombre repetido
-  tampoco está acordada.
+  heredado, no JWT firmado; `/api/backend-health` devuelve texto crudo de
+  errores de conexión. El emisor no tiene contrato JWT documentado. La política
+  de sobrescritura de una carga con nombre repetido tampoco está acordada.
 
 Todos los endpoints requieren el header `Authorization`. El formato observado
 es `Bearer <token-base64>`, donde el texto decodificado tiene
@@ -39,8 +37,8 @@ se infieren del serializador y de los valores SQLite observados en
 
 ### 1. Qué hace
 
-Lista las tareas del propietario indicado; si no se indica `owner` o está
-vacío, lista las tareas del usuario extraído del token.
+Lista las tareas del usuario extraído del token. Si no se indica `owner` o está
+vacío, se usa ese usuario; si se indica otro propietario, responde `403`.
 
 ### 2. Autenticación
 
@@ -51,7 +49,7 @@ heredado descrito arriba (`api/app/main.py:19-28`).
 
 | campo/parámetro | tipo | obligatorio | descripción |
 |---|---|---:|---|
-| `owner` (query) | string | No | Propietario por el que filtrar. Si falta o es cadena vacía, se usa `username` del token. El valor se pasa parametrizado a SQLite. |
+| `owner` (query) | string | No | Debe coincidir con `username` del token. Si falta o es cadena vacía, se usa ese usuario. Un propietario distinto recibe `403`. El valor se pasa parametrizado a SQLite. |
 | `Authorization` (header) | string | Sí | Token heredado en Base64, precedido por `Bearer `. |
 
 Ejemplo completo:
@@ -107,13 +105,13 @@ Ejemplo completo:
 | estado | cuándo ocurre | ejemplo de cuerpo |
 |---|---|---|
 | `401 Unauthorized` | Header ausente o token que no se puede decodificar/validar. El detalle depende de la excepción interna. | `{"detail":"Invalid token: Incorrect padding"}` |
+| `403 Forbidden` | `owner` solicitado no coincide con `username` del token. | `{"detail":"Not authorized to access this owner"}` |
 | `500 Internal Server Error` | Error no manejado, por ejemplo fallo de SQLite. La respuesta observada de FastAPI sin debug es texto plano. | `Internal Server Error` |
 
 ### 6. Notas de seguridad
 
-- El `owner` de query se acepta como valor de filtro sin comprobar que
-  corresponda a la identidad del token. Los valores SQL se parametrizan
-  (`api/app/main.py:70-73`).
+- El `owner` de query debe corresponder a la identidad del token
+  (`api/app/main.py:69-80`). Los valores SQL se parametrizan.
 - El token heredado no es JWT firmado y su secreto estático no ofrece prueba
   criptográfica de autenticidad.
 
@@ -139,7 +137,7 @@ heredado descrito arriba (`api/app/main.py:19-28`).
 | `description` | string | No | Descripción; por defecto `""`. El valor se convierte a string. |
 | `status` | string | No | Estado; por defecto `"TODO"`. El valor se convierte a string. |
 | `priority` | string | No | Prioridad; por defecto `"MEDIUM"`. El valor se convierte a string. |
-| `owner` | string | No | Propietario; por defecto usa `username` del token. Si se envía, el código actual permite asignar otro propietario. |
+| `owner` | string | No | Propietario; por defecto usa `username` del token. Si se envía, debe coincidir con ese usuario; un valor distinto recibe `403`. |
 | `Authorization` (header) | string | Sí | Token heredado en Base64, precedido por `Bearer `. |
 
 Ejemplo completo:
@@ -191,16 +189,17 @@ Ejemplo completo:
 | estado | cuándo ocurre | ejemplo de cuerpo |
 |---|---|---|
 | `401 Unauthorized` | Header ausente o token inválido. | `{"detail":"Invalid token: Incorrect padding"}` |
+| `403 Forbidden` | `owner` enviado no coincide con `username` del token. | `{"detail":"Not authorized to access this owner"}` |
 | `422 Unprocessable Entity` | Cuerpo ausente, JSON mal formado o raíz que no cumple el tipo objeto esperado por FastAPI. | `{"detail":[{"type":"missing","loc":["body"],"msg":"Field required","input":null}]}` |
 | `500 Internal Server Error` | Error no manejado durante inserción, commit o consulta SQLite. Respuesta observada sin debug: texto plano. | `Internal Server Error` |
 
 ### 6. Notas de seguridad
 
 - Los valores del `INSERT` y la consulta de recuperación usan parámetros
-  SQLite (`api/app/main.py:84-93`), por lo que texto con comillas se almacena
+  SQLite (`api/app/main.py:92-101`), por lo que texto con comillas se almacena
   como dato.
-- El campo `owner` del cliente puede asignar tareas a un usuario diferente al
-  del token; el comportamiento está observado, no implica autorización.
+- El `owner` enviado debe coincidir con el usuario del token
+  (`api/app/main.py:91`).
 - El token heredado no tiene firma criptográfica.
 
 ---
@@ -210,7 +209,8 @@ Ejemplo completo:
 ### 1. Qué hace
 
 Resume el total de tareas, su distribución por estado y las tareas abiertas de
-prioridad alta para un propietario.
+prioridad alta para el usuario extraído del token. Si se indica un `owner`
+distinto, responde `403`.
 
 ### 2. Autenticación
 
@@ -221,7 +221,7 @@ heredado descrito arriba (`api/app/main.py:19-28`).
 
 | campo/parámetro | tipo | obligatorio | descripción |
 |---|---|---:|---|
-| `owner` (query) | string | No | Propietario a resumir. Si falta o está vacío, se usa `username` del token. |
+| `owner` (query) | string | No | Debe coincidir con `username` del token. Si falta o está vacío, se usa ese usuario; otro valor recibe `403`. |
 | `Authorization` (header) | string | Sí | Token heredado en Base64, precedido por `Bearer `. |
 
 Ejemplo completo:
@@ -262,12 +262,13 @@ Ejemplo completo:
 | estado | cuándo ocurre | ejemplo de cuerpo |
 |---|---|---|
 | `401 Unauthorized` | Header ausente o token inválido. | `{"detail":"Invalid token: Incorrect padding"}` |
+| `403 Forbidden` | `owner` solicitado no coincide con `username` del token. | `{"detail":"Not authorized to access this owner"}` |
 | `500 Internal Server Error` | Error no manejado al consultar SQLite. Respuesta observada sin debug: texto plano. | `Internal Server Error` |
 
 ### 6. Notas de seguridad
 
-- El valor `owner` de query se usa como parámetro SQL, pero no se verifica
-  contra la identidad del token (`api/app/main.py:96-102`).
+- El valor `owner` de query se restringe a la identidad del token
+  (`api/app/main.py:102-110`).
 - La identidad no puede considerarse fiable mientras se acepte el token Base64
   heredado sin firma.
 

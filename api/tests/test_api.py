@@ -59,7 +59,7 @@ def test_rejects_invalid_token(tmp_path: Path) -> None:
     assert response.status_code == 401
 
 
-def test_owner_filter_and_create_currently_allow_another_owner(tmp_path: Path) -> None:
+def test_user_cannot_access_or_create_tasks_for_another_owner(tmp_path: Path) -> None:
     app = create_app(str(tmp_path / "workshop.db"), str(tmp_path / "uploads"))
     with TestClient(app) as client:
         tasks = client.get("/api/tasks", headers=headers(), params={"owner": "trainer"})
@@ -73,14 +73,38 @@ def test_owner_filter_and_create_currently_allow_another_owner(tmp_path: Path) -
                 "owner": "trainer",
             },
         )
+        created_count = app.state.connection.execute(
+            "SELECT COUNT(*) FROM tasks WHERE title=?",
+            ("Trainer task",),
+        ).fetchone()[0]
+
+    assert tasks.status_code == 403
+    assert summary.status_code == 403
+    assert created.status_code == 403
+    assert created_count == 0
+
+
+def test_user_can_filter_and_create_tasks_for_themselves(tmp_path: Path) -> None:
+    app = create_app(str(tmp_path / "workshop.db"), str(tmp_path / "uploads"))
+    with TestClient(app) as client:
+        tasks = client.get("/api/tasks", headers=headers(), params={"owner": "student"})
+        summary = client.get("/api/summary", headers=headers(), params={"owner": "student"})
+        created = client.post(
+            "/api/tasks",
+            headers=headers(),
+            json={
+                "title": "Student task",
+                "description": "Owned by the authenticated user",
+                "owner": "student",
+            },
+        )
 
     assert tasks.status_code == 200
-    assert [task["owner"] for task in tasks.json()] == ["trainer"]
+    assert all(task["owner"] == "student" for task in tasks.json())
     assert summary.status_code == 200
-    assert summary.json()["owner"] == "trainer"
-    assert summary.json()["total"] == 1
+    assert summary.json()["owner"] == "student"
     assert created.status_code == 201
-    assert created.json()["owner"] == "trainer"
+    assert created.json()["owner"] == "student"
 
 
 def test_create_task_with_quote_is_stored_as_data(tmp_path: Path) -> None:
@@ -211,12 +235,12 @@ def test_owner_filters_treat_sql_expressions_as_data(tmp_path: Path) -> None:
     with TestClient(app) as client:
         tasks = client.get(
             "/api/tasks",
-            headers=headers(),
+            headers=headers(username=sql_like_owner),
             params={"owner": sql_like_owner},
         )
         summary = client.get(
             "/api/summary",
-            headers=headers(),
+            headers=headers(username=sql_like_owner),
             params={"owner": sql_like_owner},
         )
 

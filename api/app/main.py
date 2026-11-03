@@ -66,9 +66,15 @@ def create_app(db_path: str | None = None, upload_dir: str | None = None) -> Fas
             "createdAt": row["created_at"],
         }
 
+    def resolve_owner(requested_owner: str | None, identity: dict[str, str]) -> str:
+        authenticated_owner = identity["username"]
+        if requested_owner is not None and requested_owner != authenticated_owner:
+            raise HTTPException(status_code=403, detail="Not authorized to access this owner")
+        return authenticated_owner
+
     @app.get("/api/tasks")
     def list_tasks(owner: str | None = Query(default=None), identity: dict[str, str] = Depends(legacy_identity)) -> list[dict[str, Any]]:
-        requested_owner = owner or identity["username"]
+        requested_owner = resolve_owner(owner or None, identity)
         sql = "SELECT id,title,description,status,owner,priority,created_at FROM tasks WHERE owner=? ORDER BY id"
         rows = connection.execute(sql, (requested_owner,)).fetchall()
         result: list[dict[str, Any]] = []
@@ -82,7 +88,7 @@ def create_app(db_path: str | None = None, upload_dir: str | None = None) -> Fas
         description = str(payload.get("description", ""))
         status = str(payload.get("status", "TODO"))
         priority = str(payload.get("priority", "MEDIUM"))
-        owner = str(payload.get("owner", identity["username"]))
+        owner = resolve_owner(str(payload.get("owner", identity["username"])), identity)
         sql = "INSERT INTO tasks(title,description,status,owner,priority,created_at) VALUES (?,?,?,?,?,datetime('now'))"
         cursor = connection.execute(sql, (title, description, status, owner, priority))
         connection.commit()
@@ -94,7 +100,7 @@ def create_app(db_path: str | None = None, upload_dir: str | None = None) -> Fas
 
     @app.get("/api/summary")
     def summary(owner: str | None = Query(default=None), identity: dict[str, str] = Depends(legacy_identity)) -> dict[str, Any]:
-        requested_owner = owner or identity["username"]
+        requested_owner = resolve_owner(owner or None, identity)
         rows = connection.execute(
             "SELECT status,priority FROM tasks WHERE owner=?",
             (requested_owner,),
