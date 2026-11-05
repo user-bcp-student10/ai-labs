@@ -8,5 +8,5 @@
 
 ## 2. Consulta de credenciales y regresión
 
-- [ ] 2.1 Cambiar únicamente la consulta de credenciales en `LegacyDatabase` para usar `PreparedStatement` con parámetros para `username` y `password`, preservando el mapeo de resultados; verificar que `mvn -Dtest=AuthResourceTest test` pasa desde `auth/`.
-- [ ] 2.2 Ejecutar `mvn test` desde `auth/` y confirmar que toda la suite pasa, incluidos login válido y los dos rechazos de inyección con `401` sin `token`.
+- [x] 2.1 Cambiar únicamente la consulta de credenciales en `LegacyDatabase` para usar `PreparedStatement` con parámetros para `username` y `password`, preservando el mapeo de resultados; verificar que `mvn -Dtest=AuthResourceTest test` pasa desde `auth/`.
+- [x] 2.2 Ejecutar `mvn test` desde `auth/` y confirmar que toda la suite pasa, incluidos login válido y los dos rechazos de inyección con `401` sin `token`.
