@@ -5,7 +5,7 @@ tools:
   - read
   - edit
   - search
-  - github-local/*
+  - github-official/*
 handoffs:
   - label: Revisar arquitectura
     agent: Architect

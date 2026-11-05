@@ -6,7 +6,7 @@ tools:
   - edit
   - search
   - execute
-  - github-local/*
+  - github-official/*
 ---
 
 # Developer

@@ -4,7 +4,7 @@ description: Comprende sistemas existentes, identifica hallazgos con evidencia y
 tools:
   - read
   - search
-  - github-local/*
+  - github-official/*
 handoffs:
   - label: Convertir hallazgo aprobado en spec
     agent: PM-PO

@@ -5,7 +5,7 @@ tools:
   - read
   - edit
   - search
-  - github-local/*
+  - github-official/*
 handoffs:
   - label: Implementar issue aprobado
     agent: Developer
