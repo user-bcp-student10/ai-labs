@@ -58,7 +58,7 @@ Alternativa considerada: introducir un nuevo modelo o formato común de errores.
 ## Incremental Strategy
 
 1. Añadir primero las pruebas HTTP que caracterizan el login válido y las credenciales normales no válidas; conservar la prueba de éxito existente y sus aserciones de `200`, `user.username` y `token`.
-2. Añadir casos de inyección por separado para `username` y `password`, verificando `401` y ausencia de `token`. Estos casos deben reproducir el defecto antes de cambiar la consulta.
+2. Añadir casos de inyección por separado para `username` y `password`, verificando `401` y ausencia de `token`. Solo el caso de `password` reproduce el defecto antes de cambiar la consulta; el de `username` pasa con `401` y actúa como regresión.
 3. Cambiar únicamente la búsqueda de credenciales en `LegacyDatabase`, manteniendo columnas seleccionadas, correspondencia de parámetros, conversión a `UserRecord` y comportamiento de no coincidencia.
 4. Ejecutar `mvn test` desde `auth/` y revisar el contrato de login protegido antes de integrar.
 
@@ -71,7 +71,7 @@ Antes de modificar la consulta, las pruebas deben dejar registrados estos compor
 - Payload `' OR '1'='1` como usuario, con contraseña no válida: el resultado objetivo es `401` y sin `token`.
 - Payload `' OR '1'='1` como contraseña para `student`: el resultado objetivo es `401` y sin `token`.
 
-Los dos últimos casos son pruebas de regresión para el comportamiento requerido y se espera que fallen contra la consulta vulnerable actual; no se debe aceptar un `200` ni un token como resultado intermedio válido.
+Solo el caso de contraseña es una prueba de regresión que se espera que falle contra la consulta vulnerable actual (devuelve `200` con `token`). El caso de usuario con contraseña no válida pasa con `401` antes del cambio, porque `AND` se evalúa antes que `OR` y la condición de contraseña sigue sin cumplirse; se conserva como protección del escenario de la spec, sin demostrar el defecto. No se debe aceptar un `200` ni un token como resultado intermedio válido.
 
 ## Risks / Trade-offs
 

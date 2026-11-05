@@ -2,9 +2,9 @@
 
 ## 1. Pruebas de caracterización HTTP
 
-- [ ] 1.1 Conservar la caracterización del login válido (`200`, `user.username` y `token`) y añadir credenciales normales no válidas (`401`, sin `token`) en `AuthResourceTest`; verificar con `mvn -Dtest=AuthResourceTest test` desde `auth/`.
-- [ ] 1.2 Añadir un caso de inyección en `username` con `' OR '1'='1`; ejecutar ese caso antes del cambio funcional y confirmar que reproduce el bypass actual, no un fallo de configuración.
-- [ ] 1.3 Añadir un caso de inyección en `password` con `' OR '1'='1`; ejecutarlo antes del cambio funcional y confirmar que reproduce el bypass actual, no un fallo de configuración.
+- [x] 1.1 Conservar la caracterización del login válido (`200`, `user.username` y `token`) y añadir credenciales normales no válidas (`401`, sin `token`) en `AuthResourceTest`; verificar con `mvn -Dtest=AuthResourceTest test` desde `auth/`.
+- [x] 1.2 Añadir un caso de inyección en `username` con `' OR '1'='1`; ejecutarlo antes del cambio funcional y confirmar que pasa con `401` sin `token` (no reproduce el bypass con contraseña no válida) y se conserva como regresión.
+- [x] 1.3 Añadir un caso de inyección en `password` con `' OR '1'='1`; ejecutarlo antes del cambio funcional y confirmar que reproduce el bypass actual, no un fallo de configuración.
 
 ## 2. Consulta de credenciales y regresión
 
